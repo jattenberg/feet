@@ -44,7 +44,7 @@ setup(
     description="a declarative feature engineering pipeline based on sklearn",
     url="http://github.com/jattenberg/feet",
     author="jattenberg",
-    author_email="ja1517@stern.nyu.edu",
+    author_email="josh@attenberg.org",
     license="MIT",
     packages=["feet", "tests"],
     zip_safe=False,
