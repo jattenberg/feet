@@ -1,8 +1,6 @@
 #!/bin/bash
 
-project="feet"
-
-venv="$project-virtualenv"
+venv="feet-virtualenv"
 
 echo "building virtualenv: $venv"
 
@@ -13,7 +11,7 @@ if [ "$?" != "0" ];
 fi
 
 virtualenv $venv
-source $venv/bin/activate
 
-pip install -e .
+echo "installing feet"
+$venv/bin/pip install -e .
 

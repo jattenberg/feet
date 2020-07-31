@@ -18,7 +18,6 @@ required_libraries = [
     "google_compute_engine",
     "pandas",
     "prettytable",
-    "psycopg2",
     "pyparsing",
     "pyspark",
     "python-dateutil",
