@@ -16,10 +16,10 @@ from sklearn.preprocessing import (
     LabelBinarizer,
     StandardScaler,
     PolynomialFeatures,
-    Imputer,
     MinMaxScaler,
     Normalizer,
 )
+from sklearn.impute import SimpleImputer
 from sklearn.mixture import GaussianMixture
 from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
