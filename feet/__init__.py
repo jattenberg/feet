@@ -1,1 +1,1 @@
-from features_pipeline import pipeline_from_config, pipeline_from_config_file
+from .features_pipeline import pipeline_from_config, pipeline_from_config_file
