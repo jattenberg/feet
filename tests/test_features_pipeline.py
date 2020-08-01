@@ -4,7 +4,7 @@ import numpy as np
 from faker import Faker
 from sklearn.datasets import load_iris, fetch_20newsgroups
 
-from feat import pipeline_from_config
+from feet import pipeline_from_config
 
 iris_predictive_columns = ['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)']
 target_column = 'target'
