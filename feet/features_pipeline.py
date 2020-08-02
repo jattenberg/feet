@@ -24,7 +24,12 @@ from sklearn.mixture import GaussianMixture
 from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.feature_extraction import FeatureHasher
-from sklearn.decomposition import TruncatedSVD, NMF, LatentDirichletAllocation, KernelPCA
+from sklearn.decomposition import (
+    TruncatedSVD,
+    NMF,
+    LatentDirichletAllocation,
+    KernelPCA,
+)
 from sklearn.ensemble import RandomTreesEmbedding
 from sklearn.feature_selection import (
     SelectKBest,
@@ -32,9 +37,9 @@ from sklearn.feature_selection import (
     mutual_info_regression,
     chi2,
     f_classif,
-    mutual_info_classif
+    mutual_info_classif,
 )
-    
+
 
 from flair.data import Sentence
 from flair.embeddings import (
@@ -110,10 +115,14 @@ config =
           and used to `transform` data to create potentially
           useful features 
     """
-    if not "pre_process" in config\
-       and not "transforms" in config\
-       and not "post_process" in config:
-        raise ValueError("invalid configuration. must specify at least one of 'pre_process' 'transforms', 'post_process'")
+    if (
+        not "pre_process" in config
+        and not "transforms" in config
+        and not "post_process" in config
+    ):
+        raise ValueError(
+            "invalid configuration. must specify at least one of 'pre_process' 'transforms', 'post_process'"
+        )
     return _compound_pipeline_from_config(config)
 
 
@@ -135,17 +144,28 @@ def _handle_transform(transform):
     if transform_type == "featurizer":
         if isinstance(transform["field"], (list,)):
             if len(transform["field"]) < 1:
-                raise ValueError("transforms require a non-empty list of fields to operate on")
-            transformer_list = [_transformers_from_config(field, transform["transforms"]) for field in transform["field"]]
-            return ("%s_combined" % "_".join(transform["field"]), FeatureUnion(transformer_list=transformer_list))
+                raise ValueError(
+                    "transforms require a non-empty list of fields to operate on"
+                )
+            transformer_list = [
+                _transformers_from_config(field, transform["transforms"])
+                for field in transform["field"]
+            ]
+            return (
+                "%s_combined" % "_".join(transform["field"]),
+                FeatureUnion(transformer_list=transformer_list),
+            )
         else:
             if not transform["field"]:
                 raise ValueError("Invalid or false field value")
-            return _transformers_from_config(transform["field"], transform["transforms"])
+            return _transformers_from_config(
+                transform["field"], transform["transforms"]
+            )
     elif transform_type == "compound":
         return ("compound", _compound_pipeline_from_config(transform))
     else:
         raise ValueError("invalid transform type: %s" % transform["type"])
+
 
 def _handle_preprocess(pre_process):
     name = pre_process["name"]
@@ -153,22 +173,33 @@ def _handle_preprocess(pre_process):
     field = pre_process["field"]
 
     if not field or (isinstance(field, (list,)) and len(field) < 1):
-        raise ValueError("invalid field passed for preprocessing. requires a single column name or non-empty list of column names, depending on the process")
+        raise ValueError(
+            "invalid field passed for preprocessing. requires a single column name or non-empty list of column names, depending on the process"
+        )
 
     return get_preprocess(name)(field, **config)
+
 
 def _handle_postprocess(components, post_process):
     name = post_process["name"]
     configs = post_process.get("config", {})
     return get_postprocess(name)(components, **configs)
 
+
 def _handle_postprocess_sequence(components, postprocess_config):
     if len(postprocess_config) > 0:
         if isinstance(postprocess_config[0], (list,)):
-            logging.debug("processing: %s" % ", ".join(p["name"] for p in postprocess_config[0]))
-            processed = [_handle_postprocess(components, post_process) for post_process in postprocess_config[0]]
+            logging.debug(
+                "processing: %s" % ", ".join(p["name"] for p in postprocess_config[0])
+            )
+            processed = [
+                _handle_postprocess(components, post_process)
+                for post_process in postprocess_config[0]
+            ]
         else:
-            logging.debug("processing a single post process: %s" % postprocess_config[0]["name"])
+            logging.debug(
+                "processing a single post process: %s" % postprocess_config[0]["name"]
+            )
             processed = [_handle_postprocess(components, postprocess_config[0])]
         out = FeatureUnion(transformer_list=processed)
 
@@ -181,17 +212,26 @@ def _compound_pipeline_from_config(config):
     """
        constructing complex pipelines
     """
-    preprocess = [_handle_preprocess(pre) for pre in config["pre_process"]] if "pre_process" in config else []
-    components = [_handle_transform(transform) for transform in config["transforms"]] if "transforms" in config else [('identity', Pipeline([('identity', IdentityTransformer())]))]
-    
-    steps = Pipeline(preprocess + [("components", FeatureUnion(transformer_list=components))])
+    preprocess = (
+        [_handle_preprocess(pre) for pre in config["pre_process"]]
+        if "pre_process" in config
+        else []
+    )
+    components = (
+        [_handle_transform(transform) for transform in config["transforms"]]
+        if "transforms" in config
+        else [("identity", Pipeline([("identity", IdentityTransformer())]))]
+    )
+
+    steps = Pipeline(
+        preprocess + [("components", FeatureUnion(transformer_list=components))]
+    )
 
     if "post_process" in config and len(config["post_process"]) > 0:
         out = _handle_postprocess_sequence(steps, config["post_process"])
-        return Pipeline([('post_processed', out)])
+        return Pipeline([("post_processed", out)])
     else:
         return steps
-
 
 
 def get_transformer(name):
@@ -202,47 +242,49 @@ def get_transformer(name):
        todo: handle more manual feature creation pipelines
     """
     transformer_map = {
-        "standard"         : build_numeric_column,
-        "standard_numeric" : build_numeric_column,
-        "quantile_numeric" : build_quantile_column,
-        "range_numeric"    : build_range_scaler,
-        "dummyizer"        : build_dummyizer,
-        "null_transformer" : build_null,  # don't do anything to this column
-        "tokenizer"        : build_word_tokenizer,
-        "array_vocab"      : build_array_vocabizer,
-        "tfidf"            : build_tfidf_transformer,
-        "word_count"       : build_wordcount_transformer,
-        "hashing"          : build_feature_hashing_transformer,
-        "w2v"              : build_word2vec_transformer,
-        "gs_lda"           : build_gs_lda_transformer,
-        "flair"            : build_flair_transformer,
-        "lda"              : build_lda_shortcut,
+        "standard": build_numeric_column,
+        "standard_numeric": build_numeric_column,
+        "quantile_numeric": build_quantile_column,
+        "range_numeric": build_range_scaler,
+        "dummyizer": build_dummyizer,
+        "null_transformer": build_null,  # don't do anything to this column
+        "tokenizer": build_word_tokenizer,
+        "array_vocab": build_array_vocabizer,
+        "tfidf": build_tfidf_transformer,
+        "word_count": build_wordcount_transformer,
+        "hashing": build_feature_hashing_transformer,
+        "w2v": build_word2vec_transformer,
+        "gs_lda": build_gs_lda_transformer,
+        "flair": build_flair_transformer,
+        "lda": build_lda_shortcut,
     }
     return transformer_map[name]
 
+
 def get_preprocess(name):
     processor_map = {
-        "concat" : build_field_concatter,
-        "fillna" : build_na_filler,
+        "concat": build_field_concatter,
+        "fillna": build_na_filler,
     }
 
     return processor_map[name]
 
+
 def get_postprocess(name):
     processor_map = {
-        "null"   : build_null_pipeline,
-        "nmf"    : build_nmf,
-        "svd"    : build_svd,
-        "lda"    : build_lda,
-        "rte"    : build_rte,
-        "poly"   : build_polynomial,
-        "abs"    : build_abs,
-        "norm"   : build_norm,
-        "std"    : build_standardizer,
-        "select" : build_feature_selector,
-        "kmeans" : build_kmeans_embedder,
-        "gmm"    : build_gmm_embedder,
-        "kpca"   : build_kernel_pca_embedder,
+        "null": build_null_pipeline,
+        "nmf": build_nmf,
+        "svd": build_svd,
+        "lda": build_lda,
+        "rte": build_rte,
+        "poly": build_polynomial,
+        "abs": build_abs,
+        "norm": build_norm,
+        "std": build_standardizer,
+        "select": build_feature_selector,
+        "kmeans": build_kmeans_embedder,
+        "gmm": build_gmm_embedder,
+        "kpca": build_kernel_pca_embedder,
     }
 
     return processor_map[name]
@@ -298,12 +340,7 @@ def build_range_scaler(col, min=0, max=1):
 def build_dummyizer(col):
     return (
         "onehot_s_%s" % col,
-        Pipeline(
-            [
-                ("selector", ItemSelector(col)),
-                ("label", Dummyizer()),
-            ]
-        ),
+        Pipeline([("selector", ItemSelector(col)), ("label", Dummyizer()),]),
     )
 
 
@@ -472,12 +509,10 @@ def build_flair_transformer(
         ),
     )
 
-def build_lda_shortcut(col,
-                       rank=50,
-                       min_df=0.0,
-                       max_df=1.0,
-                       max_features=None,
-                       ngrams=2):
+
+def build_lda_shortcut(
+    col, rank=50, min_df=0.0, max_df=1.0, max_features=None, ngrams=2
+):
 
     return (
         "lda_%s" % col,
@@ -540,26 +575,26 @@ def build_word2vec_transformer(
         ),
     )
 
+
 """
    #####################################################################################
    pre processor convenience methods
    #####################################################################################
 """
 
-def build_field_concatter(cols,
-                          out_field,
-                          glue=" "):
-    return ("concatter_%s" % "_".join(cols),
-            Pipeline([
-                ('concat_cols', Concatenator(cols, out_field=out_field, glue=glue))
-            ]))
+
+def build_field_concatter(cols, out_field, glue=" "):
+    return (
+        "concatter_%s" % "_".join(cols),
+        Pipeline([("concat_cols", Concatenator(cols, out_field=out_field, glue=glue))]),
+    )
 
 
 def build_na_filler(col, value=0):
-    return ("na_filler_%s" % col,
-            Pipeline([
-                ('na_filler', NAFiller(col=col, value=value))
-            ]))
+    return (
+        "na_filler_%s" % col,
+        Pipeline([("na_filler", NAFiller(col=col, value=value))]),
+    )
 
 
 """
@@ -601,39 +636,51 @@ def build_svd(pipeline, rank=50):
         ),
     )
 
+
 def build_kmeans_embedder(pipeline, clusters=10):
     return (
         "kmeans",
-        Pipeline(
-            [("preprocessed", pipeline), ("kmeans", KMeans(n_clusters=clusters))]
-        ),
+        Pipeline([("preprocessed", pipeline), ("kmeans", KMeans(n_clusters=clusters))]),
     )
+
 
 def build_gmm_embedder(pipeline, clusters=10, covariance="full"):
     return (
         "gmm",
         Pipeline(
-            [("preprocessed", pipeline), ("gmm", GaussianMixtureModel(n_components=clusters, covariance=covariance))]
+            [
+                ("preprocessed", pipeline),
+                (
+                    "gmm",
+                    GaussianMixtureModel(n_components=clusters, covariance=covariance),
+                ),
+            ]
         ),
     )
 
-def build_kernel_pca_embedder(pipeline,
-                              n_components=50,
-                              kernel='linear',
-                              degree=3,
-                              gamma=None):
+
+def build_kernel_pca_embedder(
+    pipeline, n_components=50, kernel="linear", degree=3, gamma=None
+):
 
     return (
         "pca",
         Pipeline(
             [
                 ("preprocessed", pipeline),
-                ("gmm", KernelPCA(n_components=n_components, kernel=kernel, degree=degree, gamma=gamma))
+                (
+                    "gmm",
+                    KernelPCA(
+                        n_components=n_components,
+                        kernel=kernel,
+                        degree=degree,
+                        gamma=gamma,
+                    ),
+                ),
             ]
-        )
+        ),
     )
-    
-    
+
 
 def build_rte(
     pipeline,
@@ -695,25 +742,33 @@ def build_norm(pipeline, norm="l2"):
         Pipeline([("preprocessed", pipeline), ("normalizer", Normalizer(norm))]),
     )
 
+
 def build_feature_selector(pipeline, to_get, how="f_classif"):
     selectors = {
-        "f_classif"              : f_classif,
-        "chi2"                   : chi2,
-        "mutual_info_classif"    : mutual_info_classif,
-        "f_regression"           : f_regression,
-        "mutual_info_regression" : mutual_info_regression,
+        "f_classif": f_classif,
+        "chi2": chi2,
+        "mutual_info_classif": mutual_info_classif,
+        "f_regression": f_regression,
+        "mutual_info_regression": mutual_info_regression,
     }
-    
+
     return (
         "feature_selector",
-        Pipeline([("preprocessed", pipeline), ("selector", SelectKBest(k=to_get, how=selectors[how]))]),
+        Pipeline(
+            [
+                ("preprocessed", pipeline),
+                ("selector", SelectKBest(k=to_get, how=selectors[how])),
+            ]
+        ),
     )
 
+
 def build_standardizer(pipeline):
-    return ('standardizer', Pipeline([
-        ("preprocessed", pipeline),
-        ("standardized", StandardScaler())
-    ]))
+    return (
+        "standardizer",
+        Pipeline([("preprocessed", pipeline), ("standardized", StandardScaler())]),
+    )
+
 
 def build_recursive_postprocess(pipeline, post_process_list):
     if len(post_process_list) > 0:
@@ -746,15 +801,18 @@ class ItemSelector(BaseEstimator, TransformerMixin):
                 "unsupported itemselector type. implement some new stuff: %s" % type(X)
             )
 
+
 class IdentityTransformer(BaseEstimator, TransformerMixin):
     """
     does nothing
     """
+
     def fit(self, X, y=None):
         return self
 
     def transform(self, X, y=None):
         return X
+
 
 class Reshaper(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):
@@ -773,6 +831,7 @@ class Dummyizer(BaseEstimator, TransformerMixin):
     def transform(self, X):
         return self.dummyizer.transform(X)
 
+
 class NAFiller(BaseEstimator, TransformerMixin):
     def __init__(self, col, value=0):
         self.col = col
@@ -785,12 +844,15 @@ class NAFiller(BaseEstimator, TransformerMixin):
         def _filler(c):
             def _inner_filler(df):
                 return df[c].fillna(value=self.value)
+
             return (c, _inner_filler)
+
         if isinstance(self.col, (list,)):
             trans = dict([_filler(c) for c in self.col])
             return X.assign(**trans)
         else:
             return X.assign(**{_filler(self.col)})
+
 
 class Concatenator(BaseEstimator, TransformerMixin):
     def __init__(self, cols, out_field, glue=" "):
@@ -804,11 +866,11 @@ class Concatenator(BaseEstimator, TransformerMixin):
     def transform(self, X):
         def _inner_joiner(row):
             return self.glue.join(row.values.astype(str))
-        
+
         def _joiner(df):
             return df[self.cols].apply(_inner_joiner, axis=1)
-        
-        out = X.assign(**{self.out_field: _joiner })
+
+        out = X.assign(**{self.out_field: _joiner})
         return out
 
 
@@ -972,15 +1034,15 @@ class W2Vifier(BaseEstimator, TransformerMixin):
 class FlairEmbeddingGenerator(BaseEstimator, TransformerMixin):
     def _collect_embeddings(self, embeddings):
         embedders = {
-            "flair-forward"  : FlairEmbeddings("multi-forward"),
-            "flair-backward" : FlairEmbeddings("multi-backward"),
-            "charm-forward"  : CharLMEmbeddings("news-forward"),
-            "charm-backward" : CharLMEmbeddings("news-backward"),
-            "glove"          : WordEmbeddings("glove"),
-            "bert-small"     : BertEmbeddings("bert-base-uncased"),
-            "bert-large"     : BertEmbeddings("bert-large-uncased"),
-            "elmo-small"     : ELMoEmbeddings("small"),
-            "elmo-large"     : ELMoEmbeddings("original"),
+            "flair-forward": FlairEmbeddings("multi-forward"),
+            "flair-backward": FlairEmbeddings("multi-backward"),
+            "charm-forward": CharLMEmbeddings("news-forward"),
+            "charm-backward": CharLMEmbeddings("news-backward"),
+            "glove": WordEmbeddings("glove"),
+            "bert-small": BertEmbeddings("bert-base-uncased"),
+            "bert-large": BertEmbeddings("bert-large-uncased"),
+            "elmo-small": ELMoEmbeddings("small"),
+            "elmo-large": ELMoEmbeddings("original"),
         }
 
         return [embedders[embedding] for embedding in embeddings]
@@ -990,8 +1052,8 @@ class FlairEmbeddingGenerator(BaseEstimator, TransformerMixin):
         self.pooling = pooling
 
         poolers = {
-            "lstm"        : DocumentLSTMEmbeddings,
-            "doc-pooling" : DocumentPoolEmbeddings,
+            "lstm": DocumentLSTMEmbeddings,
+            "doc-pooling": DocumentPoolEmbeddings,
         }
         self.embedder = poolers[self.pooling](self._collect_embeddings(self.embeddings))
 
@@ -1048,11 +1110,12 @@ class AbsoluteValue(BaseEstimator, TransformerMixin):
     def transform(self, X):
         return [abs(x) for x in X]
 
+
 class GaussianMixtureModel(BaseEstimator, TransformerMixin):
-
     def __init__(self, n_components=10, covariance="full"):
-        self.gmm = GaussianMixture(n_components=n_components, covariance_type=covariance)
-
+        self.gmm = GaussianMixture(
+            n_components=n_components, covariance_type=covariance
+        )
 
     def fit(self, X, y=None):
         self.gmm.fit(X)

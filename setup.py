@@ -32,9 +32,9 @@ required_libraries = [
     "scipy",
     "six",
     "statsmodels",
-    "torch==1.0.0",
-    "tqdm==4.26.0",
-    "wrapt==1.10.0",
+    "torch",
+    "tqdm>=4.29.1",
+    "wrapt",
 ]
 
 setup(
